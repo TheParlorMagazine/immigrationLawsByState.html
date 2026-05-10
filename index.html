@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Immigration Enforcement Laws by State (2024–2025)</title>
+  <style>
+    :root { --bg:#fff; --fg:#111; --muted:#666; --stroke:#e5e5e5; --active:#0b5fff; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 20px; margin: 0 0 6px; }
+    p.meta { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+    /* Visibility helpers for Wix embeds */
+    .viz { position: relative; border: 1px solid var(--stroke); border-radius: 14px; padding: 14px; min-height: 650px; }
+    svg { width: 100%; height: 610px; display:block; }
+
+    .state { stroke: var(--stroke); stroke-width: 1; cursor: default; outline: none; }
+    .state.has-laws { cursor: pointer; }
+    .state:focus-visible { stroke: var(--active); stroke-width: 2; }
+
+    .legend { display:flex; flex-wrap: wrap; gap:12px; align-items:center; margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--stroke); display:inline-block; }
+
+    .tooltip {
+      position: absolute;
+      min-width: 260px;
+      max-width: 420px;
+      background: rgba(255,255,255,.98);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      padding: 12px 12px 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity .12s ease, transform .12s ease;
+      z-index: 10;
+    }
+    .tooltip.show { opacity: 1; transform: translateY(0); }
+    .tooltip h2 { font-size: 13px; margin: 0 0 6px; }
+    .tooltip .count { color: var(--muted); font-weight: 500; }
+    .tooltip ul { margin: 8px 0 0; padding: 0 0 0 16px; }
+    .tooltip li { margin: 6px 0; }
+    .pill {
+      display:inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      margin-left: 6px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .source {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Immigration Enforcement Laws by State (2024–2025)</h1>
+    <p class="meta">Hover or tab to a state to see enacted/adopted measures.</p>
+
+    <div class="viz" id="viz">
+      <div class="tooltip" id="tooltip" role="dialog" aria-live="polite"></div>
+      <svg id="map" viewBox="0 0 975 610" preserveAspectRatio="xMidYMid meet" aria-label="Map of the United States"></svg>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <span class="swatch" style="background:#f3f3f3"></span> No laws in dataset
+      <span class="swatch" style="background:#cfe3ff"></span> 1–2 laws
+      <span class="swatch" style="background:#7fb0ff"></span> 3–5 laws
+      <span class="swatch" style="background:#0b5fff"></span> 6+ laws
+    </div>
+
+    <div class="source">Source: National Conference of State Legislatures</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+
+  <script>
+    // ------------- 1) DATA: load from your Wix HTTP Function -------------
+    async function loadData() {
+      const endpoint = "https://theparlormagazine.com/_functions/immigrationLawsByState";
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load lawsByState JSON: " + res.status);
+      return res.json();
+    }
+
+    // FIPS -> USPS mapping
+    const fipsToUSPS = new Map([
+      [1,"AL"],[2,"AK"],[4,"AZ"],[5,"AR"],[6,"CA"],[8,"CO"],[9,"CT"],[10,"DE"],[11,"DC"],
+      [12,"FL"],[13,"GA"],[15,"HI"],[16,"ID"],[17,"IL"],[18,"IN"],[19,"IA"],[20,"KS"],[21,"KY"],
+      [22,"LA"],[23,"ME"],[24,"MD"],[25,"MA"],[26,"MI"],[27,"MN"],[28,"MS"],[29,"MO"],[30,"MT"],
+      [31,"NE"],[32,"NV"],[33,"NH"],[34,"NJ"],[35,"NM"],[36,"NY"],[37,"NC"],[38,"ND"],[39,"OH"],
+      [40,"OK"],[41,"OR"],[42,"PA"],[44,"RI"],[45,"SC"],[46,"SD"],[47,"TN"],[48,"TX"],[49,"UT"],
+      [50,"VT"],[51,"VA"],[53,"WA"],[54,"WV"],[55,"WI"],[56,"WY"]
+    ]);
+
+    const uspsToName = {
+      AL:"Alabama", AK:"Alaska", AZ:"Arizona", AR:"Arkansas", CA:"California", CO:"Colorado", CT:"Connecticut",
+      DE:"Delaware", DC:"District of Columbia", FL:"Florida", GA:"Georgia", HI:"Hawaii", ID:"Idaho", IL:"Illinois",
+      IN:"Indiana", IA:"Iowa", KS:"Kansas", KY:"Kentucky", LA:"Louisiana", ME:"Maine", MD:"Maryland", MA:"Massachusetts",
+      MI:"Michigan", MN:"Minnesota", MS:"Mississippi", MO:"Missouri", MT:"Montana", NE:"Nebraska", NV:"Nevada",
+      NH:"New Hampshire", NJ:"New Jersey", NM:"New Mexico", NY:"New York", NC:"North Carolina", ND:"North Dakota",
+      OH:"Ohio", OK:"Oklahoma", OR:"Oregon", PA:"Pennsylvania", RI:"Rhode Island", SC:"South Carolina", SD:"South Dakota",
+      TN:"Tennessee", TX:"Texas", UT:"Utah", VT:"Vermont", VA:"Virginia", WA:"Washington", WV:"West Virginia",
+      WI:"Wisconsin", WY:"Wyoming"
+    };
+
+    function fillForCount(n) {
+      if (!n) return "#f3f3f3";
+      if (n <= 2) return "#cfe3ff";
+      if (n <= 5) return "#7fb0ff";
+      return "#0b5fff";
+    }
+
+    const svg = d3.select("#map");
+    const tooltip = document.getElementById("tooltip");
+    const viz = document.getElementById("viz");
+    const TOPO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+
+    Promise.all([d3.json(TOPO_URL), loadData()])
+      .then(([us, lawsByState]) => {
+        const states = topojson.feature(us, us.objects.states).features;
+
+        const projection = d3.geoAlbersUsa()
+          .translate([975/2, 610/2])
+          .scale(1300);
+
+        const path = d3.geoPath(projection);
+
+        svg.append("g")
+          .selectAll("path")
+          .data(states)
+          .join("path")
+          .attr("d", path)
+          .attr("class", d => {
+            const usps = fipsToUSPS.get(+d.id);
+            const has = usps && lawsByState[usps] && lawsByState[usps].length > 0;
+            return `state ${has ? "has-laws" : ""}`;
+          })
+          .attr("tabindex", d => {
+            const usps = fipsToUSPS.get(+d.id);
+            const has = usps && lawsByState[usps] && lawsByState[usps].length > 0;
+            return has ? 0 : -1;
+          })
+          .attr("role", d => {
+            const usps = fipsToUSPS.get(+d.id);
+            const has = usps && lawsByState[usps] && lawsByState[usps].length > 0;
+            return has ? "button" : "img";
+          })
+          .attr("aria-label", d => {
+            const usps = fipsToUSPS.get(+d.id);
+            const name = uspsToName[usps] || "State";
+            const count = (lawsByState[usps]?.length || 0);
+            return count ? `${name}: ${count} laws in dataset` : `${name}: no laws in dataset`;
+          })
+          .attr("fill", d => {
+            const usps = fipsToUSPS.get(+d.id);
+            const count = lawsByState[usps]?.length || 0;
+            return fillForCount(count);
+          })
+          .on("mouseenter", function(event, d) { showTooltip(event, d, lawsByState); })
+          .on("mousemove", function(event) { moveTooltip(event); })
+          .on("mouseleave", function() { hideTooltip(); })
+          .on("focus", function(event, d) { showTooltip(event, d, lawsByState, true); })
+          .on("blur", function() { hideTooltip(); });
+
+        // State borders overlay
+        svg.append("path")
+          .datum(topojson.mesh(us, us.objects.states, (a,b) => a !== b))
+          .attr("fill", "none")
+          .attr("stroke", "#e5e5e5")
+          .attr("stroke-width", 1)
+          .attr("d", path);
+
+        function showTooltip(event, d, lawsByState, fromKeyboard=false) {
+          const usps = fipsToUSPS.get(+d.id);
+          const records = lawsByState[usps] || [];
+          if (!records.length) return;
+
+          const name = uspsToName[usps] || usps;
+
+          const items = records.slice(0, 10).map(r => `
+            <li>
+              <strong>${escapeHtml(r.bill || "")}</strong>
+              <span class="pill">${escapeHtml(String(r.year || ""))}</span>
+              <div style="margin-top:4px;color:#222">${escapeHtml(r.summary || "")}</div>
+              <div style="margin-top:4px;color:#666">
+                ${escapeHtml(r.status_detail || "")} • Last action: ${escapeHtml(r.last_action_date || "")}
+              </div>
+            </li>
+          `).join("");
+
+          tooltip.innerHTML = `
+            <h2>${escapeHtml(name)} <span class="count">(${records.length} law${records.length===1?"":"s"})</span></h2>
+            <ul>${items}</ul>
+            ${records.length > 10 ? `<div style="color:#666;margin-top:8px">Showing 10 of ${records.length}.</div>` : ""}
+          `;
+
+          tooltip.classList.add("show");
+
+          if (fromKeyboard) {
+            const rect = viz.getBoundingClientRect();
+            tooltip.style.left = (rect.width / 2 - 180) + "px";
+            tooltip.style.top = "18px";
+          } else {
+            moveTooltip(event);
+          }
+        }
+
+        function moveTooltip(event) {
+          const rect = viz.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+
+          const pad = 12;
+          const ttW = tooltip.offsetWidth || 320;
+          const ttH = tooltip.offsetHeight || 160;
+
+          let left = x + 14;
+          let top  = y + 14;
+
+          if (left + ttW + pad > rect.width) left = x - ttW - 14;
+          if (top  + ttH + pad > rect.height) top  = y - ttH - 14;
+
+          left = Math.max(pad, Math.min(left, rect.width - ttW - pad));
+          top  = Math.max(pad, Math.min(top, rect.height - ttH - pad));
+
+          tooltip.style.left = left + "px";
+          tooltip.style.top = top + "px";
+        }
+
+        function hideTooltip() { tooltip.classList.remove("show"); }
+
+        function escapeHtml(str) {
+          return String(str).replace(/[&<>"']/g, s => ({
+            "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+          }[s]));
+        }
+      })
+      .catch(err => {
+        document.body.innerHTML = `<div style="padding:20px;font-family:system-ui;color:#b00020">
+          <strong>Map failed to load.</strong><br>${String(err)}
+        </div>`;
+      });
+  </script>
+</body>
+</html>
