@@ -274,9 +274,18 @@ stroke-width:1;
             const usps=fipsToUSPS.get(+d.id);
             return fillForCount(lawsByState[usps]?.length||0);
           })
-          .on("mouseenter",function(event,d){showTooltip(event,d,lawsByState);})
-          .on("mousemove",function(event){moveTooltip(event);})
-          .on("mouseleave",function(){hideTooltip();})
+          .on("click",function(event,d){
+  event.stopPropagation();
+  showTooltip(event,d,lawsByState);
+  tooltip.dataset.pinned='true';
+})
+.on("mouseenter",function(event,d){showTooltip(event,d,lawsByState);})
+.on("mousemove",function(event){
+  if(!tooltip.dataset.pinned) moveTooltip(event);
+})
+.on("mouseleave",function(){
+  if(!tooltip.dataset.pinned) hideTooltip();
+})
           .on("focus",function(event,d){showTooltip(event,d,lawsByState,true);})
           .on("blur",function(){hideTooltip();});
 
@@ -347,6 +356,10 @@ stroke-width:1;
           Map failed to load — ${String(err)}
         </div>`;
       });
+    document.addEventListener('click',()=>{
+  tooltip.dataset.pinned='';
+  hideTooltip();
+});
   </script>
 </body>
 </html>
