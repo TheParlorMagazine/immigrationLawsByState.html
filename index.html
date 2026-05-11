@@ -356,9 +356,11 @@ stroke-width:1;
           Map failed to load — ${String(err)}
         </div>`;
       });
-    document.addEventListener('click',()=>{
-  tooltip.dataset.pinned='';
-  hideTooltip();
+   document.addEventListener('click', function(e){
+  if(!e.target.closest('.state') && !e.target.closest('.tooltip')){
+    tooltip.dataset.pinned='';
+    hideTooltip();
+  }
 });
   </script>
 </body>
