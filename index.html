@@ -282,8 +282,8 @@ stroke-width:0.8;
         svg.append("path")
           .datum(topojson.mesh(us,us.objects.states,(a,b)=>a!==b))
           .attr("fill","none")
-          .attr("stroke","rgba(245,240,232,0.08)")
-          .attr("stroke-width",0.5)
+          .attr("stroke","rgba(245,240,232,0.25)")
+.attr("stroke-width",0.8)
           .attr("d",path);
 
         function showTooltip(event,d,lawsByState,fromKeyboard=false){
