@@ -112,19 +112,21 @@ stroke-width:1;
 
     /* TOOLTIP */
     .tooltip{
-      position:absolute;
-      min-width:240px;max-width:380px;
-      background:rgba(12,12,12,0.98);
-      border:1px solid var(--border);
-      box-shadow:0 8px 32px rgba(0,0,0,0.6);
-      padding:14px;
-      font-size:12px;line-height:1.4;
-      pointer-events:none;
-      opacity:0;
-      transform:translateY(6px);
-      transition:opacity .12s ease, transform .12s ease;
-      z-index:10;
-    }
+  position:absolute;
+  min-width:240px;max-width:380px;
+  max-height:400px;
+  overflow-y:auto;
+  background:rgba(12,12,12,0.98);
+  border:1px solid var(--border);
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  padding:14px;
+  font-size:12px;line-height:1.4;
+  pointer-events:auto;
+  opacity:0;
+  transform:translateY(6px);
+  transition:opacity .12s ease, transform .12s ease;
+  z-index:10;
+}
     .tooltip.show{opacity:1;transform:translateY(0);}
     .tooltip h2{
       font-family:'Bebas Neue',sans-serif;
